@@ -1,0 +1,22 @@
+import matplotlib.pyplot as plt
+import numpy as np
+
+def draw_tree(x, y, angle, depth, branch_length, angle_variation):
+    if depth == 0:
+        return
+
+    x2 = x + int(np.cos(angle) * depth * branch_length)
+    y2 = y + int(np.sin(angle) * depth * branch_length)
+
+    plt.plot([x, x2], [y, y2], color='brown', lw=depth)
+
+    draw_tree(x2, y2, angle - angle_variation, depth - 1, branch_length, angle_variation)
+    draw_tree(x2, y2, angle + angle_variation, depth - 1, branch_length, angle_variation)
+
+plt.figure(figsize=(10, 10))
+draw_tree(0, -100, np.pi / 2, 10, 10, np.pi / 6)
+plt.xlim(-200, 200)
+plt.ylim(-200, 200)
+plt.axis('off')
+plt.title("Fractal Tree Visualization")
+plt.show()
