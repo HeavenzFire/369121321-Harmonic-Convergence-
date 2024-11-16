@@ -1,0 +1,91 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import math
+import random
+
+# Constants
+phi = (1 + 5**0.5) / 2  # Golden ratio
+pi = math.pi
+e = math.e
+
+# Function to calculate resonance frequency
+def calculate_resonance_frequency(input_value):
+    frequency = input_value * phi**3
+    return frequency
+
+# Function to generate toroid coordinates
+def generate_toroid(input_value, theta):
+    toroid_x = input_value * math.cos(theta) * phi**2
+    toroid_y = input_value * math.sin(theta) * phi**2
+    toroid_z = input_value * phi**3
+    return toroid_x, toroid_y, toroid_z
+
+# Function to create cloud coordinates
+def create_cloud(input_value, theta):
+    random_offset = random.uniform(-1, 1)
+    cloud_x = input_value * math.cos(theta) * phi**2 + random_offset
+    cloud_y = input_value * math.sin(theta) * phi**2 + random_offset
+    cloud_z = input_value * phi**3 + random_offset
+    return cloud_x, cloud_y, cloud_z
+
+# Function to simulate time dilation
+def simulate_time_dilation(factor, duration, steps):
+    time_steps = np.linspace(0, duration, steps)
+    adjusted_time = time_steps * factor
+    return adjusted_time
+
+# Parameters
+input_value = 10
+theta = np.linspace(0, 2 * pi, 100)
+duration = 10
+steps = 1000
+slow_factor = 0.5
+fast_factor = 2.0
+
+# Calculate resonance frequency
+resonance_frequency = calculate_resonance_frequency(input_value)
+print(f"Resonance Frequency: {resonance_frequency}")
+
+# Generate toroid and cloud coordinates
+toroid_coords = [generate_toroid(input_value, t) for t in theta]
+cloud_coords = [create_cloud(input_value, t) for t in theta]
+
+# Simulate time dilation
+slow_time = simulate_time_dilation(slow_factor, duration, steps)
+fast_time = simulate_time_dilation(fast_factor, duration, steps)
+
+# Visualization
+fig = plt.figure(figsize=(12, 6))
+
+# Plot toroid
+ax1 = fig.add_subplot(121, projection='3d')
+toroid_x, toroid_y, toroid_z = zip(*toroid_coords)
+ax1.scatter(toroid_x, toroid_y, toroid_z, color='b', label='Toroid')
+ax1.set_title("Toroid Visualization")
+ax1.set_xlabel('X')
+ax1.set_ylabel('Y')
+ax1.set_zlabel('Z')
+ax1.legend()
+
+# Plot cloud
+ax2 = fig.add_subplot(122, projection='3d')
+cloud_x, cloud_y, cloud_z = zip(*cloud_coords)
+ax2.scatter(cloud_x, cloud_y, cloud_z, color='r', label='Cloud')
+ax2.set_title("Cloud Visualization")
+ax2.set_xlabel('X')
+ax2.set_ylabel('Y')
+ax2.set_zlabel('Z')
+ax2.legend()
+
+plt.show()
+
+# Plot time dilation
+plt.figure(figsize=(10, 5))
+plt.plot(np.linspace(0, duration, steps), slow_time, label='Slow Down')
+plt.plot(np.linspace(0, duration, steps), fast_time, label='Speed Up')
+plt.xlabel('Original Time (s)')
+plt.ylabel('Adjusted Time (s)')
+plt.title('Time Dilation Simulation')
+plt.legend()
+plt.grid(True)
+plt.show()
