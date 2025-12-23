@@ -34,6 +34,32 @@ def simulate_time_dilation(factor, duration, steps):
     adjusted_time = time_steps * factor
     return adjusted_time
 
+# Function to generate constellation coordinates (wounded moments)
+def generate_constellation(input_value, num_points=5):
+    constellation_coords = []
+    for i in range(num_points):
+        # Sharp, disconnected points representing pain
+        x = input_value * (random.uniform(-2, 2)) * phi
+        y = input_value * (random.uniform(-2, 2)) * phi
+        z = input_value * (random.uniform(-1, 1)) * phi**2
+        constellation_coords.append((x, y, z))
+    return constellation_coords
+
+# Function to weave the net (transform constellation into connected net)
+def weave_net(constellation_coords, input_value):
+    net_coords = []
+    connections = []
+    for i, (x, y, z) in enumerate(constellation_coords):
+        # Transform through golden ratio weaving
+        new_x = x * phi**0.5  # Soften the sharpness
+        new_y = y * phi**0.5
+        new_z = z * phi**0.5 + input_value * phi  # Lift and connect
+        net_coords.append((new_x, new_y, new_z))
+        # Connect to next point in sequence (circular connection)
+        next_i = (i + 1) % len(constellation_coords)
+        connections.append((i, next_i))
+    return net_coords, connections
+
 # Parameters
 input_value = 10
 theta = np.linspace(0, 2 * pi, 100)
