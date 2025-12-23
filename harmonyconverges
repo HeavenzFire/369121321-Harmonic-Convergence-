@@ -80,11 +80,34 @@ cloud_coords = [create_cloud(input_value, t) for t in theta]
 slow_time = simulate_time_dilation(slow_factor, duration, steps)
 fast_time = simulate_time_dilation(fast_factor, duration, steps)
 
+# Generate constellation and execute Syntropic Hell
+constellation_coords = generate_constellation(input_value, num_points=5)
+print(f"Initial Constellation Points: {len(constellation_coords)}")
+
+# Destroy weakness symbol
+constellation_coords, destroyed_point = destroy_weakness_symbol(constellation_coords)
+print(f"DESTROYED WEAKNESS SYMBOL: Point at {destroyed_point} - PROVEN ONLINE")
+print(f"Remaining Constellation Points: {len(constellation_coords)}")
+
+# Execute Syntropic Hell phases
+phase1_coords = execute_biological_override(constellation_coords, input_value)
+print("PHASE I: BIOLOGICAL OVERRIDE EXECUTED - Dopamine Fast and Pain Integration Complete")
+
+phase2_coords = execute_social_firewalling(phase1_coords, input_value)
+print("PHASE II: SOCIAL FIREWALLING EXECUTED - Void Protocol and Optical Rebrand Complete")
+
+phase3_coords = execute_resource_hoarding(phase2_coords, input_value)
+print("PHASE III: RESOURCE HOARDING EXECUTED - War Chest Accumulation Complete")
+
+god_king_coords = execute_psychic_domination(phase3_coords, input_value)
+print("PHASE IV: PSYCHIC DOMINATION EXECUTED - Narrative Inversion Complete")
+print("GOD-KING STATE ACHIEVED - BIOS OVERWRITTEN")
+
 # Visualization
-fig = plt.figure(figsize=(12, 6))
+fig = plt.figure(figsize=(16, 8))
 
 # Plot toroid
-ax1 = fig.add_subplot(121, projection='3d')
+ax1 = fig.add_subplot(231, projection='3d')
 toroid_x, toroid_y, toroid_z = zip(*toroid_coords)
 ax1.scatter(toroid_x, toroid_y, toroid_z, color='b', label='Toroid')
 ax1.set_title("Toroid Visualization")
@@ -94,7 +117,7 @@ ax1.set_zlabel('Z')
 ax1.legend()
 
 # Plot cloud
-ax2 = fig.add_subplot(122, projection='3d')
+ax2 = fig.add_subplot(232, projection='3d')
 cloud_x, cloud_y, cloud_z = zip(*cloud_coords)
 ax2.scatter(cloud_x, cloud_y, cloud_z, color='r', label='Cloud')
 ax2.set_title("Cloud Visualization")
@@ -103,6 +126,29 @@ ax2.set_ylabel('Y')
 ax2.set_zlabel('Z')
 ax2.legend()
 
+# Plot constellation (wounded)
+ax3 = fig.add_subplot(233, projection='3d')
+if constellation_coords:
+    const_x, const_y, const_z = zip(*constellation_coords)
+    ax3.scatter(const_x, const_y, const_z, color='purple', s=100, label='Wounded Constellation')
+ax3.set_title("Wounded Constellation")
+ax3.set_xlabel('X')
+ax3.set_ylabel('Y')
+ax3.set_zlabel('Z')
+ax3.legend()
+
+# Plot GOD-KING state
+ax4 = fig.add_subplot(234, projection='3d')
+if god_king_coords:
+    god_x, god_y, god_z = zip(*god_king_coords)
+    ax4.scatter(god_x, god_y, god_z, color='gold', s=150, label='GOD-KING State')
+ax4.set_title("GOD-KING State")
+ax4.set_xlabel('X')
+ax4.set_ylabel('Y')
+ax4.set_zlabel('Z')
+ax4.legend()
+
+plt.tight_layout()
 plt.show()
 
 # Plot time dilation
