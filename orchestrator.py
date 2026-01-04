@@ -5,6 +5,9 @@ from typing import List, Dict, Any
 from dataclasses import dataclass
 import aiohttp
 import logging
+from sentence_transformers import SentenceTransformer
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -102,19 +105,24 @@ class Orchestrator:
             logger.error(f"Failed to call agent {agent.name}: {e}")
             return {"agent": agent.name, "response": f"Error: {str(e)}", "success": False}
 
+    def _compute_agent_embeddings(self):
+        """Pre-compute embeddings for agent roles."""
+        agent_texts = [f"{agent.category}: {agent.role}" for agent in self.agents.values()]
+        embeddings = self.model.encode(agent_texts)
+        return {agent.id: embeddings[i] for i, agent in enumerate(self.agents.values())}
+
     def select_agents(self, task: str, top_n: int = 6) -> List[Agent]:
-        # Simple keyword routing (expand with embedding search later)
-        keywords = {
-            "code": [a for a in self.agents.values() if "code" in a.role.lower() or "coding" in a.category.lower()],
-            "image": [a for a in self.agents.values() if "image" in a.role.lower() or "media" in a.category.lower()],
-            "music": [a for a in self.agents.values() if "music" in a.role.lower()],
-            "reasoning": [a for a in self.agents.values() if "general" in a.category.lower()],
-        }
-        for key, agents in keywords.items():
-            if key in task.lower():
-                return agents[:top_n]
-        # Default: top general agents
-        return [a for a in list(self.agents.values())[:top_n]]
+        """Semantic agent selection using embeddings."""
+        task_embedding = self.model.encode([task])[0]
+        similarities = {}
+        for agent_id, agent_emb in self.agent_embeddings.items():
+            sim = cosine_similarity([task_embedding], [agent_emb])[0][0]
+            similarities[agent_id] = sim
+
+        # Sort agents by similarity and return top_n
+        sorted_agents = sorted(similarities.items(), key=lambda x: x[1], reverse=True)
+        selected_ids = [agent_id for agent_id, _ in sorted_agents[:top_n]]
+        return [self.agents[aid] for aid in selected_ids]
 
     async def orchestrate(self, task: str) -> str:
         selected = self.select_agents(task)
@@ -123,14 +131,37 @@ class Orchestrator:
         tasks = [self.call_agent(agent, task) for agent in selected]
         results = await asyncio.gather(*tasks)
 
-        # Simple aggregation: collect all
-        aggregated = "\n\n".join([
-            f"**{r['agent']}**: {r['response']}" for r in results if r['success']
-        ])
+        # Voting/ranking: Use judge agent to pick best response
+        judge_result = await self._judge_responses(task, results)
+        return judge_result
 
-        # Optional: final synthesis (could route to one strong agent)
-        synthesis = f"\n\n=== ORCHESTRATED RESULT ===\nTask: {task}\n\n{aggregated}"
-        return synthesis
+    async def _judge_responses(self, task: str, results: List[Dict[str, Any]]) -> str:
+        """Use judge agent (Grok) to evaluate and select best response."""
+        judge_agent = self.agents[1]  # Grok as judge
+        if not judge_agent.endpoint:
+            # Fallback to simple aggregation if no real API
+            aggregated = "\n\n".join([
+                f"**{r['agent']}**: {r['response']}" for r in results if r['success']
+            ])
+            return f"\n\n=== ORCHESTRATED RESULT ===\nTask: {task}\n\n{aggregated}"
+
+        # Prepare judge prompt
+        responses_text = "\n".join([
+            f"Agent {r['agent']}: {r['response']}" for r in results if r['success']
+        ])
+        judge_prompt = f"""Task: {task}
+
+Agent Responses:
+{responses_text}
+
+As an expert judge, evaluate these responses and select the BEST one. Provide:
+1. Your reasoning (brief)
+2. The selected agent and response
+
+Format: SELECTED: [Agent Name] - [Response]"""
+
+        judge_response = await self.call_real_api(judge_agent, judge_prompt)
+        return f"\n\n=== JUDGED RESULT ===\nTask: {task}\n\n{judge_response}"
 
 # Run it
 async def main():
