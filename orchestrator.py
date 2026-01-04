@@ -8,6 +8,7 @@ import logging
 from sentence_transformers import SentenceTransformer
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
+from collections import deque
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
