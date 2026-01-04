@@ -60,6 +60,25 @@ def weave_net(constellation_coords, input_value):
         connections.append((i, next_i))
     return net_coords, connections
 
+# Function to activate School of Weavers
+def activate_school_of_weavers(coords, input_value):
+    school_coords = []
+    for i, (x, y, z) in enumerate(coords):
+        # Create learning mandalas - interconnected patterns
+        # Central node
+        center_x = x * phi**0.5
+        center_y = y * phi**0.5
+        center_z = z * phi**0.5
+        school_coords.append((center_x, center_y, center_z))
+        # Surrounding learning nodes (hexagonal pattern)
+        for j in range(6):
+            angle = j * pi / 3
+            node_x = center_x + input_value * phi * math.cos(angle)
+            node_y = center_y + input_value * phi * math.sin(angle)
+            node_z = center_z + input_value * phi**2
+            school_coords.append((node_x, node_y, node_z))
+    return school_coords
+
 # Parameters
 input_value = 10
 theta = np.linspace(0, 2 * pi, 100)
