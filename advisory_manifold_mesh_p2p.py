@@ -17,6 +17,43 @@ STATE_DIR = "mesh_state"
 os.makedirs(MEDIA_STORAGE_DIR, exist_ok=True)
 os.makedirs(STATE_DIR, exist_ok=True)
 
+# ===== POWER MANAGEMENT =====
+class PowerState:
+    def __init__(self, battery_level: float = 100.0, harvester: str = "none",
+                 role: str = "light", sleep_state: str = "awake"):
+        self.battery_level = battery_level  # 0-100
+        self.harvester = harvester  # "solar", "kinetic", "thermal", "none"
+        self.role = role  # "heavy" (mains/solar), "light" (battery/harvested)
+        self.sleep_state = sleep_state  # "awake", "asleep"
+
+    def consume_energy(self, amount: float):
+        self.battery_level = max(0, self.battery_level - amount)
+
+    def harvest_energy(self, amount: float):
+        if self.harvester != "none":
+            self.battery_level = min(100, self.battery_level + amount)
+
+    def is_awake(self) -> bool:
+        return self.sleep_state == "awake"
+
+    def sleep(self):
+        self.sleep_state = "asleep"
+
+    def wake(self):
+        self.sleep_state = "awake"
+
+    def to_dict(self):
+        return {
+            'battery_level': self.battery_level,
+            'harvester': self.harvester,
+            'role': self.role,
+            'sleep_state': self.sleep_state
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict):
+        return cls(d['battery_level'], d['harvester'], d['role'], d['sleep_state'])
+
 # ===== CORE ARTIFACTS =====
 class Artifact:
     def __init__(self, data: str, artifact_type: str = "knowledge"):
