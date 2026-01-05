@@ -1,0 +1,25 @@
+{
+  "system_id": "zazo-core",
+  "version": "1.0.0",
+  "timestamp": "2026-01-05T09:30:00Z",
+  "phase": "INIT",
+  "health": {
+    "stability": 0.0,
+    "entropy": 0.0,
+    "coherence": 0.0
+  },
+  "risk": {
+    "budget": 1.0,
+    "consumed": 0.0,
+    "locked": false
+  },
+  "decision": {
+    "last_id": null,
+    "explainable": true
+  },
+  "invariants": {
+    "reversible": true,
+    "auditable": true,
+    "human_override": true
+  }
+}
