@@ -37,6 +37,13 @@ class CaseVerifier:
         Returns:
             Risk score as float (0.0-1.0) or None if verification fails
         """
+        if self.mock:
+            # Mock implementation: deterministic risk score based on case_id hash
+            import hashlib
+            hash_val = int(hashlib.md5(case_id.encode()).hexdigest(), 16)
+            risk_score = (hash_val % 1000) / 1000.0  # 0.000 to 0.999
+            return risk_score
+
         try:
             payload = {
                 'case_id': case_id,
