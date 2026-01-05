@@ -1,7 +1,10 @@
 import argparse
 import os
+import sys
+sys.path.append('/vercel/sandbox')
 from atlas_light.payload import CulturalPayload
 from atlas_light.optimization import optimize_propagation
+from resonator import VortexResonator
 
 def seed_command(directory: str, radio: bool = False, mesh: bool = False):
     """Seed content from directory"""
