@@ -74,10 +74,42 @@ class GlobalMeshNode:
                 self.state[str(artifact_id)] = artifact
                 self.evolve_artifact(artifact)
 
+    def calculate_quality(self, artifact):
+        """Calculate quality score based on value, processing diversity, and recency"""
+        value = artifact.get("value", 0)
+        diversity = len(set(artifact.get("processed_by", [])))
+        recency = 1 / (time.time() - artifact.get("timestamp", time.time()) + 1)
+        return value * (1 + diversity) * recency
+
+    def merge_artifacts(self, existing, incoming):
+        """Merge artifacts using quality-weighted consensus"""
+        existing_quality = self.calculate_quality(existing)
+        incoming_quality = self.calculate_quality(incoming)
+
+        if abs(existing_quality - incoming_quality) < 0.1:  # Close quality, merge
+            merged_value = (existing.get("value", 0) * existing_quality + incoming.get("value", 0) * incoming_quality) / (existing_quality + incoming_quality)
+            merged_processed = list(set(existing.get("processed_by", []) + incoming.get("processed_by", [])))
+            merged_timestamp = max(existing.get("timestamp", 0), incoming.get("timestamp", 0))
+            return {
+                "id": existing["id"],
+                "data": existing.get("data", "") + " | " + incoming.get("data", ""),
+                "processed_by": merged_processed,
+                "timestamp": merged_timestamp,
+                "value": merged_value,
+                "quality": (existing_quality + incoming_quality) / 2
+            }
+        elif incoming_quality > existing_quality:
+            incoming["quality"] = incoming_quality
+            return incoming
+        else:
+            existing["quality"] = existing_quality
+            return existing
+
     def evolve_artifact(self, artifact):
         artifact["processed_by"] = artifact.get("processed_by", []) + [self.name]
         artifact["timestamp"] = time.time()
         artifact["value"] = artifact.get("value", 0) + random.random()
+        artifact["quality"] = self.calculate_quality(artifact)
         self.broadcast_artifact(artifact)
 
     # ===== Autonomous Artifact Generation =====
@@ -110,6 +142,18 @@ class GlobalMeshNode:
         if peer_port not in self.peers:
             self.peers.append(peer_port)
 
+    # ===== Consensus Evaluation =====
+    def consensus_evaluation(self):
+        while True:
+            with self.lock:
+                high_quality_artifacts = [a for a in self.state.values() if self.calculate_quality(a) > 1.0]
+                for artifact in high_quality_artifacts:
+                    if "consensus_promoted" not in artifact:
+                        artifact["consensus_promoted"] = True
+                        print(f"[{self.name}] Consensus promoted artifact {artifact['id']} (quality: {artifact.get('quality', 0):.2f})")
+                        self.broadcast_artifact(artifact)
+            time.sleep(10)
+
 # ===== Multi-Device Mesh Initialization =====
 ports = [5001, 5002, 5003, 5004, 5005, 5006]
 nodes = [GlobalMeshNode(f"Node{i+1}", port) for i, port in enumerate(ports)]
@@ -123,6 +167,7 @@ for node in nodes:
     node.start_server()
     threading.Thread(target=node.generate_new_artifacts, daemon=True).start()
     threading.Thread(target=node.self_heal, daemon=True).start()
+    threading.Thread(target=node.consensus_evaluation, daemon=True).start()
 
 # Seed initial artifacts if state empty
 for i, node in enumerate(nodes):
