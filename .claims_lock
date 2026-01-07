@@ -1,0 +1,49 @@
+PURPOSE
+This file defines the only allowed public claims and language
+for this repository and any derivative communication.
+
+SCOPE
+Applies to:
+- README.md
+- docs/overview.md
+- docs/pilot.md
+- presentations, emails, talks, grant materials
+- issue descriptions and pull requests
+
+ALLOWED CLAIMS
+- "Prototype decision support system"
+- "Human-in-the-loop at all times"
+- "Prevention-oriented design"
+- "Requires independent validation"
+- "Designed to surface early risk signals"
+- "Advisory only; no automated enforcement"
+- "Pilot-ready under constrained scope"
+
+REQUIRED DISCLAIMERS
+- No claims of operational deployment
+- No claims of outcome guarantees
+- No claims of accuracy, recall, or cost savings
+- All metrics labeled as simulated or synthetic if referenced
+
+DISALLOWED LANGUAGE
+- Accuracy percentages
+- Cost multipliers or dollar comparisons
+- Market replacement, extinction, absorption, or dominance
+- Inevitability, autonomy, or self-activation
+- Enforcement, execution, takeover, or coercive framing
+- Claims of being "live", "production", or "at scale"
+
+DATA CLAIMS POLICY
+- Only describe what the system is designed to evaluate
+- Never describe results without ground-truth datasets
+- All evaluation plans must be forward-looking
+
+GOVERNANCE ASSERTIONS
+- Human review is mandatory for all decisions
+- System provides recommendations, not determinations
+- Adoption requires local policy approval
+- Operators retain full authority and accountability
+
+ENFORCEMENT
+Any contribution or communication that violates this file
+must be revised before merge or publication.
