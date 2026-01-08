@@ -5,6 +5,11 @@ import time
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 import random
+import os
+import hashlib
+import math
+import statistics
+from collections import deque
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -33,11 +38,22 @@ class CoreAutonomousKernel:
         self.perception_thread: Optional[threading.Thread] = None
 
     def start_kernel(self):
-        """Start the CAK main loop."""
+        """Start the CAK main loop with all subsystems."""
         self.running = True
+
+        # Start perception system
         self.perception_thread = threading.Thread(target=self._perception_loop, daemon=True)
         self.perception_thread.start()
-        logging.info("Core Autonomous Kernel started")
+
+        # Start evolution engine
+        self.evolution_thread = threading.Thread(target=self._evolution_loop, daemon=True)
+        self.evolution_thread.start()
+
+        # Start learning system
+        self.learning_thread = threading.Thread(target=self._learning_loop, daemon=True)
+        self.learning_thread.start()
+
+        logging.info("Core Autonomous Kernel started with full evolution capabilities")
 
     def stop_kernel(self):
         """Stop the CAK and all experiments."""
@@ -49,15 +65,32 @@ class CoreAutonomousKernel:
         logging.info("Core Autonomous Kernel stopped")
 
     def ingest_data(self, data_source: str, data: Dict[str, Any]):
-        """Ingest data from various sources."""
+        """Ingest data from various sources with enhanced metadata."""
         perception_entry = {
             'timestamp': datetime.now().isoformat(),
             'source': data_source,
             'data': data,
-            'processed': False
+            'processed': False,
+            'data_hash': hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest(),
+            'priority': self._calculate_data_priority(data)
         }
         self.perception_buffer.append(perception_entry)
-        logging.debug(f"Ingested data from {data_source}")
+        logging.debug(f"Ingested data from {data_source} with priority {perception_entry['priority']}")
+
+    def _calculate_data_priority(self, data: Dict[str, Any]) -> float:
+        """Calculate processing priority based on data characteristics."""
+        priority = 0.5  # Base priority
+
+        # Increase priority for critical indicators
+        if 'error' in data or 'anomaly' in data:
+            priority += 0.3
+        if 'success' in data or 'convergence' in data:
+            priority += 0.2
+        if 'threat' in data or 'alert' in data:
+            priority += 0.4
+
+        # Cap at 1.0
+        return min(priority, 1.0)
 
     def _perception_loop(self):
         """Main perception and processing loop."""
@@ -75,13 +108,32 @@ class CoreAutonomousKernel:
                 entry['processed'] = True
 
     def _analyze_data(self, entry: Dict[str, Any]):
-        """Analyze ingested data for patterns and anomalies."""
-        # Simple pattern detection - can be extended
+        """Advanced data analysis with pattern recognition and learning."""
         data = entry['data']
-        if 'error' in data:
-            self.syntropic_metrics['anomaly_score'] += 0.1
-        if 'success' in data:
-            self.syntropic_metrics['energy_level'] += 0.05
+        source = entry['source']
+
+        # Enhanced pattern detection
+        anomaly_indicators = ['error', 'failure', 'threat', 'anomaly', 'breach']
+        success_indicators = ['success', 'convergence', 'optimization', 'learning']
+
+        for indicator in anomaly_indicators:
+            if indicator in str(data).lower():
+                self.syntropic_metrics['anomaly_score'] += 0.15
+
+        for indicator in success_indicators:
+            if indicator in str(data).lower():
+                self.syntropic_metrics['energy_level'] += 0.08
+
+        # Source-specific analysis
+        if source == 'filesystem':
+            self._analyze_filesystem_patterns(data)
+        elif source == 'network':
+            self._analyze_network_patterns(data)
+        elif source == 'system':
+            self._analyze_system_patterns(data)
+
+        # Update learning model
+        self._update_learning_model(entry)
 
     def _update_syntropic_metrics(self):
         """Update syntropic state mapping metrics."""
@@ -111,9 +163,17 @@ class CoreAutonomousKernel:
             logging.warning("Convergence state file not found")
 
     def _check_for_anomalies(self):
-        """Check for anomalies that warrant experimentation."""
-        if self.syntropic_metrics['anomaly_score'] > 0.7:
-            self._launch_experiment('anomaly_response')
+        """Advanced anomaly detection with multiple triggers."""
+        anomaly_triggers = [
+            ('high_anomaly', self.syntropic_metrics['anomaly_score'] > 0.7),
+            ('low_energy', self.syntropic_metrics['energy_level'] < 0.3),
+            ('high_entropy', self.syntropic_metrics['entropy_rate'] > 0.8),
+            ('divergent_convergence', abs(self.syntropic_metrics['convergence_velocity']) > 0.15)
+        ]
+
+        for trigger_name, condition in anomaly_triggers:
+            if condition:
+                self._launch_experiment(f'{trigger_name}_response')
 
     def _launch_experiment(self, experiment_type: str):
         """Launch a self-directed experiment."""
