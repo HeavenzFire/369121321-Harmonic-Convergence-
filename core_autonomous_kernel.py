@@ -10,9 +10,191 @@ import hashlib
 import math
 import statistics
 from collections import deque
+from enum import Enum
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+class ConfidenceTier(Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+class ActionPermission(Enum):
+    OBSERVE = "observe"
+    REVIEW = "review"
+    ESCALATE = "escalate"
+
+class DecisionThresholds:
+    """
+    Governance framework for causal inference outputs.
+    Defines when evidence is sufficient for action and how uncertainty is communicated.
+    """
+
+    def __init__(self):
+        self.confidence_thresholds = {
+            ConfidenceTier.LOW: (0.0, 0.3),
+            ConfidenceTier.MEDIUM: (0.3, 0.7),
+            ConfidenceTier.HIGH: (0.7, 1.0)
+        }
+
+        self.action_permissions = {
+            ConfidenceTier.LOW: ActionPermission.OBSERVE,
+            ConfidenceTier.MEDIUM: ActionPermission.REVIEW,
+            ConfidenceTier.HIGH: ActionPermission.ESCALATE
+        }
+
+        self.audit_log: List[Dict[str, Any]] = []
+
+    def evaluate_causal_output(self, causal_metrics: Dict[str, float]) -> Dict[str, Any]:
+        """
+        Evaluate causal inference results against governance thresholds.
+
+        Args:
+            causal_metrics: Dictionary containing causal_strength, intervention_effect, counterfactual_confidence
+
+        Returns:
+            Decision governance result with tier, permission, and uncertainty report
+        """
+        # Calculate overall confidence score
+        confidence_score = self._calculate_overall_confidence(causal_metrics)
+
+        # Determine confidence tier
+        tier = self._get_confidence_tier(confidence_score)
+
+        # Get action permission
+        permission = self.action_permissions[tier]
+
+        # Generate uncertainty report
+        uncertainty_report = self._generate_uncertainty_report(causal_metrics, confidence_score)
+
+        # Create governance decision
+        decision = {
+            'timestamp': datetime.now().isoformat(),
+            'confidence_score': confidence_score,
+            'confidence_tier': tier.value,
+            'action_permission': permission.value,
+            'uncertainty_report': uncertainty_report,
+            'causal_metrics': causal_metrics,
+            'human_override_required': permission != ActionPermission.OBSERVE,
+            'audit_id': hashlib.sha256(f"{datetime.now().isoformat()}_{json.dumps(causal_metrics, sort_keys=True)}".encode()).hexdigest()[:16]
+        }
+
+        # Log decision
+        self._log_decision(decision)
+
+        return decision
+
+    def _calculate_overall_confidence(self, metrics: Dict[str, float]) -> float:
+        """Calculate weighted confidence score from multiple causal metrics."""
+        weights = {
+            'causal_strength': 0.4,
+            'intervention_effect': 0.3,
+            'counterfactual_confidence': 0.3
+        }
+
+        confidence = 0.0
+        total_weight = 0.0
+
+        for metric, weight in weights.items():
+            if metric in metrics:
+                # Normalize metric to 0-1 scale (assuming metrics are already 0-1)
+                normalized_value = max(0.0, min(1.0, metrics[metric]))
+                confidence += normalized_value * weight
+                total_weight += weight
+
+        return confidence / total_weight if total_weight > 0 else 0.0
+
+    def _get_confidence_tier(self, confidence_score: float) -> ConfidenceTier:
+        """Determine confidence tier based on score."""
+        for tier, (min_val, max_val) in self.confidence_thresholds.items():
+            if min_val <= confidence_score <= max_val:
+                return tier
+        return ConfidenceTier.LOW  # Default to lowest tier
+
+    def _generate_uncertainty_report(self, metrics: Dict[str, float], confidence_score: float) -> Dict[str, Any]:
+        """Generate human-readable uncertainty assessment."""
+        report = {
+            'confidence_level': f"{confidence_score:.2%}",
+            'confidence_interpretation': self._interpret_confidence(confidence_score),
+            'key_uncertainties': [],
+            'recommendations': []
+        }
+
+        # Analyze individual metrics for uncertainties
+        if 'causal_strength' in metrics:
+            strength = metrics['causal_strength']
+            if strength < 0.4:
+                report['key_uncertainties'].append("Weak causal relationship detected")
+            elif strength > 0.8:
+                report['key_uncertainties'].append("Strong causal evidence present")
+
+        if 'intervention_effect' in metrics:
+            effect = metrics['intervention_effect']
+            if effect < 0.2:
+                report['key_uncertainties'].append("Minimal intervention impact observed")
+            elif effect > 0.6:
+                report['key_uncertainties'].append("Significant intervention effect detected")
+
+        if 'counterfactual_confidence' in metrics:
+            cf_conf = metrics['counterfactual_confidence']
+            if cf_conf < 0.5:
+                report['key_uncertainties'].append("Counterfactual predictions have high uncertainty")
+
+        # Generate recommendations based on tier
+        tier = self._get_confidence_tier(confidence_score)
+        if tier == ConfidenceTier.LOW:
+            report['recommendations'].extend([
+                "Continue monitoring with additional data collection",
+                "Consider alternative analytical approaches",
+                "Human review recommended before any action"
+            ])
+        elif tier == ConfidenceTier.MEDIUM:
+            report['recommendations'].extend([
+                "Schedule human review of causal evidence",
+                "Validate findings with additional data sources",
+                "Document decision rationale for audit trail"
+            ])
+        else:  # HIGH
+            report['recommendations'].extend([
+                "Immediate human review required",
+                "Consider escalation to decision authorities",
+                "Prepare intervention documentation"
+            ])
+
+        return report
+
+    def _interpret_confidence(self, score: float) -> str:
+        """Provide natural language interpretation of confidence score."""
+        if score < 0.3:
+            return "Low confidence - evidence is weak or inconclusive"
+        elif score < 0.7:
+            return "Medium confidence - evidence is moderate, review recommended"
+        else:
+            return "High confidence - evidence is strong, action may be warranted"
+
+    def _log_decision(self, decision: Dict[str, Any]):
+        """Log governance decision for audit purposes."""
+        self.audit_log.append(decision)
+
+        # Keep only last 1000 decisions to prevent memory bloat
+        if len(self.audit_log) > 1000:
+            self.audit_log = self.audit_log[-1000:]
+
+        logging.info(f"Governance decision logged: {decision['audit_id']} - {decision['confidence_tier']} confidence")
+
+    def get_audit_trail(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Retrieve recent governance decisions for audit."""
+        return self.audit_log[-limit:]
+
+    def export_audit_log(self, filepath: str):
+        """Export complete audit log to file."""
+        with open(filepath, 'w') as f:
+            json.dump({
+                'export_timestamp': datetime.now().isoformat(),
+                'audit_log': self.audit_log
+            }, f, indent=2)
+        logging.info(f"Audit log exported to {filepath} with {len(self.audit_log)} entries")
 
 class CoreAutonomousKernel:
     """
