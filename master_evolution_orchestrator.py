@@ -35,23 +35,32 @@ class EvolutionIndividual:
     def __init__(self, parameters: Dict[str, Any]):
         self.parameters = parameters
         self.fitness = 0.0
+        self.fitness_vector = None  # For multi-objective evolution
         self.evaluated = False
         self.generation = 0
+        self.dominance_rank = 0  # For NSGA-II
+        self.crowding_distance = 0.0  # For NSGA-II
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             'parameters': self.parameters,
             'fitness': self.fitness,
+            'fitness_vector': self.fitness_vector,
             'evaluated': self.evaluated,
-            'generation': self.generation
+            'generation': self.generation,
+            'dominance_rank': self.dominance_rank,
+            'crowding_distance': self.crowding_distance
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'EvolutionIndividual':
         individual = cls(data['parameters'])
         individual.fitness = data['fitness']
+        individual.fitness_vector = data.get('fitness_vector')
         individual.evaluated = data['evaluated']
         individual.generation = data['generation']
+        individual.dominance_rank = data.get('dominance_rank', 0)
+        individual.crowding_distance = data.get('crowding_distance', 0.0)
         return individual
 
 class MasterEvolutionOrchestrator:
@@ -72,6 +81,7 @@ class MasterEvolutionOrchestrator:
         self.current_generation = 0
         self.population: List[EvolutionIndividual] = []
         self.best_individual: Optional[EvolutionIndividual] = None
+        self.pareto_front: List[EvolutionIndividual] = []  # For multi-objective
         self.state_file = '/vercel/sandbox/evolution_state.json'
 
         # Component instances
@@ -253,10 +263,22 @@ class MasterEvolutionOrchestrator:
 
         return min(1.0, diversity)
 
-    def evolve_generation(self):
+    def evolve_generation(self, multi_objective: bool = False):
         """Run one generation of evolution"""
         print(f"Starting generation {self.current_generation + 1}")
 
+        if multi_objective:
+            # Multi-objective evolution with NSGA-II
+            self._evolve_multi_objective_generation()
+        else:
+            # Single-objective evolution
+            self._evolve_single_objective_generation()
+
+        self.current_generation += 1
+        self.save_state()
+
+    def _evolve_single_objective_generation(self):
+        """Single-objective evolution"""
         # Evaluate fitness for unevaluated individuals
         with mp.Pool(processes=min(mp.cpu_count(), 4)) as pool:
             fitness_results = pool.map(self.evaluate_fitness, self.population)
@@ -289,9 +311,59 @@ class MasterEvolutionOrchestrator:
             new_population.append(child)
 
         self.population = new_population
-        self.current_generation += 1
 
-        self.save_state()
+    def _evolve_multi_objective_generation(self):
+        """Multi-objective evolution using NSGA-II"""
+        # Evaluate fitness vectors for unevaluated individuals
+        for individual in self.population:
+            if not individual.evaluated:
+                individual.fitness_vector = self.evaluate_multi_objective_fitness(individual)
+                individual.fitness = np.mean(individual.fitness_vector)  # For compatibility
+                individual.evaluated = True
+                individual.generation = self.current_generation
+
+        # NSGA-II: Non-dominated sorting and crowding distance
+        self._fast_non_dominated_sort()
+        self._calculate_crowding_distance()
+
+        # Update Pareto front
+        self.pareto_front = [ind for ind in self.population if ind.dominance_rank == 0]
+
+        # Update best individual (first in Pareto front)
+        if self.pareto_front:
+            # Select individual with best crowding distance from Pareto front
+            best_in_front = max(self.pareto_front, key=lambda x: x.crowding_distance)
+            if not self.best_individual or self._dominates(best_in_front, self.best_individual):
+                self.best_individual = best_in_front
+                if hasattr(self.best_individual, 'fitness_vector') and self.best_individual.fitness_vector:
+                    print(f"New Pareto front best: {self.best_individual.fitness_vector}")
+
+        # Create next generation using NSGA-II selection
+        new_population = []
+
+        # Elitism: Copy best fronts
+        fronts = self._get_fronts()
+        for front in fronts:
+            if len(new_population) + len(front) <= self.population_size:
+                new_population.extend(front)
+            else:
+                # Sort remaining front by crowding distance
+                remaining = sorted(front, key=lambda x: x.crowding_distance, reverse=True)
+                new_population.extend(remaining[:self.population_size - len(new_population)])
+                break
+
+        # Fill remaining slots with offspring
+        while len(new_population) < self.population_size:
+            parent1 = self._tournament_selection_multi()
+            parent2 = self._tournament_selection_multi()
+
+            child_params = self.crossover(parent1.parameters, parent2.parameters)
+            child_params = self.mutate(child_params)
+
+            child = EvolutionIndividual(child_params)
+            new_population.append(child)
+
+        self.population = new_population
 
     def tournament_selection(self, tournament_size: int = 5) -> EvolutionIndividual:
         """Tournament selection"""
@@ -371,7 +443,7 @@ class MasterEvolutionOrchestrator:
         except Exception as e:
             print(f"Error loading evolution state: {e}")
 
-    def run_evolution(self, generations: Optional[int] = None):
+    def run_evolution(self, generations: Optional[int] = None, multi_objective: bool = False):
         """Run evolutionary optimization"""
         if not self.population:
             self.initialize_population()
@@ -381,12 +453,15 @@ class MasterEvolutionOrchestrator:
 
         for gen in range(start_gen, min(start_gen + target_generations, self.max_generations)):
             start_time = time.time()
-            self.evolve_generation()
+            self.evolve_generation(multi_objective=multi_objective)
             elapsed = time.time() - start_time
 
             print(".4f"
             if self.best_individual:
-                print(".4f"
+                if multi_objective and hasattr(self.best_individual, 'fitness_vector') and self.best_individual.fitness_vector:
+                    print(f"Best fitness vector: {self.best_individual.fitness_vector}")
+                else:
+                    print(".4f"
             # Check for convergence
             if self._check_convergence():
                 print("Evolution converged")
