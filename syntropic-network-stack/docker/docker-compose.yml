@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  # RabbitMQ for multi-node coordination
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: syntropic-rabbitmq
+    hostname: syntropic-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: syntropic
+      RABBITMQ_DEFAULT_PASS: syntropic2026
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"   # AMQP port
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - syntropic-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: syntropic-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - syntropic-net
+    restart: unless-stopped
+
+  # Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: syntropic-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: syntropic2026
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - syntropic-net
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+  # Node Exporter for system metrics
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: syntropic-node-exporter
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - syntropic-net
+    restart: unless-stopped
+
+  # Syntropic metrics exporter (custom service)
+  syntropic-exporter:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.exporter
+    container_name: syntropic-exporter
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../agent/syntropic_log.jsonl:/app/syntropic_log.jsonl:ro
+    environment:
+      - LOG_FILE=/app/syntropic_log.jsonl
+    networks:
+      - syntropic-net
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+volumes:
+  rabbitmq_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  syntropic-net:
+    driver: bridge
